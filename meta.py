@@ -39,17 +39,19 @@ class PageMeta(type):
             code = src[snippet]
             code = code.lstrip("...[").rstrip("]")
             html = ""
+            args = []
             for bracketpair in get_bracket_pairs(code):
                 obj = code[bracketpair]
                 obj = obj.lstrip("[").rstrip("]")
-                try:
-                    html += str(eval(obj, {}))  # TODO: correct namespace
-                except NameError:
-                    if "-" in obj:
-                        html += f"</{obj[1:]}>"
-                    else:
-                        html += f"<{obj}>"
-            newsrc[snippet] = f'"{html}"' # TODO: stuff will get moved around
+                if obj[0] == '+':
+                    html += f"<{obj[1:]}>"
+                elif obj[0] == '-':
+                    html += f"</{obj[1:]}>"
+                else:
+                    html += f"{{{len(args)}}}" # TODO: escape this preliminarily
+                    args.append(obj)
+            arglist = ''.join(["["] + [item + "," for item in args] + ["]"])
+            newsrc[snippet] = f'"""{html}""".format(*{arglist})' # TODO: stuff will get moved around
 
         modified = ''.join(newsrc).strip()
         mod = compile(modified, "<string>", "exec")
