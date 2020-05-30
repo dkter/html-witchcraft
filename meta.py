@@ -54,13 +54,14 @@ class PageMeta(type):
             newsrc[snippet] = f'"""{html}""".format(*{arglist})' # TODO: stuff will get moved around
 
         modified = ''.join(newsrc).strip()
-        mod = compile(modified, "<string>", "exec")
-        ns = {}
-        exec(mod, ns)
-        return ns["render"]
+        return modified
 
     def __new__(cls, name, bases, dct):
         if "render" in dct:
             src = inspect.getsource(dct["render"])
-            dct["render"] = cls._replace(src)
+            src = cls._replace(src)
+            mod = compile(src, "<string>", "exec")
+            ns = {}
+            exec(mod, ns)
+            dct["render"] = ns["render"]
         return super().__new__(cls, name, bases, dct)
