@@ -1,66 +1,93 @@
+import ast
 import inspect
-import copy
-
-def get_snippets(src):
-    start = 0
-    while start < len(src):
-        start = src.find("...[", start)
-        nestlevel = 1
-        end = start + 4
-        while nestlevel > 0:
-            end += 1
-            if end >= len(src):
-                return
-            if src[end] == "[":
-                nestlevel += 1
-            elif src[end] == "]":
-                nestlevel -= 1
-        yield slice(start, end + 1)
-        start = end
+import textwrap
 
 
-def get_bracket_pairs(src):
-    # TODO: this assumes brackets are formed correctly
-    start = 0
-    while start < len(src):
-        start = src.find("[", start)
-        if start == -1: return
-        end = src.find("]", start)
-        yield slice(start, end + 1)
-        start = end
+class HTMLGenerator(ast.NodeVisitor):
+    """
+    Parses HTML-generating syntax into HTML.
+    """
+    def __init__(self):
+        self.html = ""
+        self.args = []
+
+
+    def generate(self, node):
+        self.visit(node)
+        return self.html, self.args
+
+
+    def visit_List(self, node):
+        element = node.elts[0]
+        if (isinstance(element, ast.UnaryOp) and
+            isinstance(element.op, ast.USub)):      # the unary - operator, used for ending tags
+            self.html = f"</{element.operand.id}>" + self.html
+        else:
+            self.html = f"<{element.id}>" + self.html
+
+
+    def visit_Subscript(self, node):
+        if (isinstance(node.slice, ast.UnaryOp) and
+            isinstance(node.slice.op, ast.USub)):     # the unary - operator, used for ending tags
+            self.html = f"</{node.slice.operand.id}>" + self.html
+        elif isinstance(node.slice, ast.Name):
+            self.html = f"<{node.slice.id}>" + self.html            
+        elif (isinstance(node.slice.value, ast.UnaryOp) and
+            isinstance(node.slice.value.op, ast.USub)):     # compatibility between <=3.8 and 3.9
+            self.html = f"</{node.slice.value.operand.id}>" + self.html
+        else:
+            self.html = f"<{node.slice.value.id}>" + self.html
+        self.visit(node.value)
+
+
+    def visit_Call(self, node):
+        self.html = "{}" + self.html
+        self.args.insert(0, node.args[0]) # TODO: convert args list into tuple
+        self.visit(node.func)
+
+
+class RenderableFunctionTransformer(ast.NodeTransformer):
+    """
+    A NodeTransformer applied to a function with embedded syntax for
+    generating HTML.
+    """
+    def visit_Subscript(self, node):
+        """
+        If the object being subscipted is the Ellipsis object (...), then this
+        method will convert everything inside the subscript to HTML.
+        """
+        if isinstance(node.value, ast.Ellipsis):
+            html_generator = HTMLGenerator()
+            html_code, args = html_generator.generate(node.slice)
+            # generates something like the following Python code:
+            # html_code.format(*args)
+            # more literally: str.format(html_code, *args)
+            return ast.Call(
+                func=ast.Attribute(
+                    value=ast.Name(id='str', ctx=ast.Load()),
+                    attr='format',
+                    ctx=ast.Load()
+                ),
+                args=[
+                    ast.Constant(value=html_code),
+                    *args
+                ],
+                keywords=[]
+            )
+        else:
+            return node
 
 
 class PageMeta(type):
-
-    @staticmethod
-    def _replace(src):
-        newsrc = list(src)
-        for snippet in get_snippets(src):
-            code = src[snippet]
-            code = code.lstrip("...[").rstrip("]")
-            html = ""
-            args = []
-            for bracketpair in get_bracket_pairs(code):
-                obj = code[bracketpair]
-                obj = obj.lstrip("[").rstrip("]")
-                if obj[0] == '+':
-                    html += f"<{obj[1:]}>"
-                elif obj[0] == '-':
-                    html += f"</{obj[1:]}>"
-                else:
-                    html += f"{{{len(args)}}}" # TODO: escape this preliminarily
-                    args.append(obj)
-            arglist = ''.join(["["] + [item + "," for item in args] + ["]"])
-            newsrc[snippet] = f'"""{html}""".format(*{arglist})' # TODO: stuff will get moved around
-
-        modified = ''.join(newsrc).strip()
-        return modified
-
     def __new__(cls, name, bases, dct):
         if "render" in dct:
             src = inspect.getsource(dct["render"])
-            src = cls._replace(src)
-            mod = compile(src, "<string>", "exec")
+            #src = cls._replace(src)
+            src = textwrap.dedent(src)
+            tree = RenderableFunctionTransformer().visit(ast.parse(src))
+            tree = ast.fix_missing_locations(tree)
+            #print(ast.unparse(tree))
+            mod = compile(tree, "<ast>", "exec")
             ns = dct["render"].__globals__
             exec(mod, ns)
             dct["render"] = ns["render"]
