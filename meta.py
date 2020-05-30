@@ -61,7 +61,7 @@ class PageMeta(type):
             src = inspect.getsource(dct["render"])
             src = cls._replace(src)
             mod = compile(src, "<string>", "exec")
-            ns = {}
+            ns = dct["render"].__globals__
             exec(mod, ns)
             dct["render"] = ns["render"]
         return super().__new__(cls, name, bases, dct)

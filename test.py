@@ -1,18 +1,18 @@
 from meta import PageMeta
+import datetime
 
 class Page(metaclass=PageMeta):
     def render(self):
-        a = "hello\n" + "world"
         return ...[
             [+html]
                 [+head]
-                    [+title] ["lol test"] [-title]
+                    [+title] ["website page"] [-title]
                 [-head]
                 [+body]
                     [+h1]
-                        ["Value of a"]
+                        ["Current date"]
                     [-h1]
-                    [+p] [a] [-p]
+                    [+p] [datetime.datetime.now()] [-p]
                 [-body]
             [-html]
         ]
