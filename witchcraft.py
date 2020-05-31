@@ -37,6 +37,9 @@ class HTMLTagGenerator(ast.NodeVisitor):
 
 
     def visit_Call(self, node):
+        if not isinstance(node.func, ast.Name):
+            raise HTMLSyntaxError("Invalid HTML tag")
+
         self.tag = f"<{node.func.id} "
         for kw in node.keywords:
             self.tag += f"{kw.arg}=\"{{}}\""
@@ -145,3 +148,7 @@ class PageMeta(type):
             # Replace the function in the class dict
             dct["render"] = ns["render"]
         return super().__new__(cls, name, bases, dct)
+
+
+class Page(metaclass=PageMeta):
+    "Simple class to make subclassing more intuitive"

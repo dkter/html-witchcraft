@@ -1,21 +1,15 @@
-from meta import PageMeta
+from witchcraft import Page
 import datetime
 
-class Page(metaclass=PageMeta):
+class ExamplePage(Page):
     def render(self):
         return ...[
             [html]
-                [head]
-                    [title] ("website page") [-title]
-                [-head]
                 [body]
-                    [h1]
-                        ("Current date")
-                    [-h1]
-                    [p] (datetime.datetime.now()) [-p]
+                    [a (href="#")] ("hi") [-a]
                 [-body]
             [-html]
         ]
 
-p = Page()
+p = ExamplePage()
 print(p.render())
