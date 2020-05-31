@@ -81,13 +81,9 @@ class HTMLGenerator(ast.NodeVisitor):
 
     def visit_List(self, node):
         "A list is typically used as the first HTML tag in a document."
-        element = node.elts[0]
-        if (isinstance(element, ast.UnaryOp) and
-            isinstance(element.op, ast.USub)):
-            # the unary - operator is used for ending tags
-            self.html = f"</{element.operand.id}>" + self.html
-        else:
-            self.html = f"<{element.id}>" + self.html
+        tag, args = HTMLTagGenerator().generate(node.elts[0])
+        self.html = tag + self.html
+        self.args = args + self.args
 
 
     def visit_Subscript(self, node):
