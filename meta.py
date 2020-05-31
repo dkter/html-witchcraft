@@ -42,7 +42,17 @@ class HTMLGenerator(ast.NodeVisitor):
 
     def visit_Call(self, node):
         self.html = "{}" + self.html
-        self.args.insert(0, node.args[0]) # TODO: convert args list into tuple
+        if len(node.args) <= 1:
+            self.args.insert(0, node.args[0])
+        else:
+            # There are commas in the bracketed statement, so turn it into a tuple
+            # This won't work with 1-length tuples with single commas, because this
+            # is being parsed as an arguments list and the comma is irrelevant
+            tup = ast.Tuple(
+                elts=node.args,
+                ctx=ast.Load()
+            )
+            self.args.insert(0, tup)
         self.visit(node.func)
 
 
@@ -82,7 +92,6 @@ class PageMeta(type):
     def __new__(cls, name, bases, dct):
         if "render" in dct:
             src = inspect.getsource(dct["render"])
-            #src = cls._replace(src)
             src = textwrap.dedent(src)
             tree = RenderableFunctionTransformer().visit(ast.parse(src))
             tree = ast.fix_missing_locations(tree)
