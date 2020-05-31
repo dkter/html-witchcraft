@@ -15,6 +15,12 @@ import inspect
 import textwrap
 
 
+def exclude(func):
+    "Decorator applied to methods to not run through the HTML generator."
+    func.__dict__["exclude"] = True
+    return func
+
+
 class HTMLSyntaxError(Exception):
     pass
 
@@ -52,10 +58,10 @@ class HTMLTagGenerator(ast.NodeVisitor):
         if not isinstance(node.func, ast.Name):
             raise HTMLSyntaxError("Invalid HTML tag")
 
-        self.tag = f"<{node.func.id} "
+        self.tag = f"<{node.func.id}"
         for kw in node.keywords:
-            self.tag += f"{kw.arg}=\"{{}}\""
-            self.args.insert(0, kw.value)
+            self.tag += f" {kw.arg}=\"{{}}\""
+            self.args.append(kw.value)
         self.tag += ">"
 
 
@@ -143,22 +149,23 @@ class RenderableFunctionTransformer(ast.NodeTransformer):
 
 class PageMeta(type):
     def __new__(cls, name, bases, dct):
-        if "render" in dct:
-            # Get function source
-            src = inspect.getsource(dct["render"])
-            src = textwrap.dedent(src)
+        for key, val in dct.items():
+            if callable(val) and "exclude" not in val.__dict__:
+                # Get function source
+                src = inspect.getsource(val)
+                src = textwrap.dedent(src)
 
-            # Transform function
-            tree = RenderableFunctionTransformer().visit(ast.parse(src))
-            tree = ast.fix_missing_locations(tree)
+                # Transform function
+                tree = RenderableFunctionTransformer().visit(ast.parse(src))
+                tree = ast.fix_missing_locations(tree)
 
-            # Compile into new function
-            mod = compile(tree, "<ast>", "exec")
-            ns = dct["render"].__globals__
-            exec(mod, ns)
+                # Compile into new function
+                mod = compile(tree, "<ast>", "exec")
+                ns = val.__globals__
+                exec(mod, ns)
 
-            # Replace the function in the class dict
-            dct["render"] = ns["render"]
+                # Replace the function in the class dict
+                dct[key] = ns[val.__name__]
         return super().__new__(cls, name, bases, dct)
 
 
