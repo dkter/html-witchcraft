@@ -3,6 +3,47 @@ import inspect
 import textwrap
 
 
+class HTMLSyntaxError(Exception):
+    pass
+
+
+class HTMLTagGenerator(ast.NodeVisitor):
+    """
+    Parses the expression inside square brackets into an HTML tag.
+    """
+    def __init__(self):
+        self.tag = ""
+        self.args = []
+
+
+    def generate(self, node):
+        self.visit(node)
+        return self.tag, self.args
+
+
+    def visit_Index(self, node):
+        self.visit(node.value)
+
+
+    def visit_UnaryOp(self, node):
+        if isinstance(node.op, ast.USub):
+            self.tag = f"</{node.operand.id}>"
+        else:
+            raise HTMLSyntaxError("Invalid HTML tag")
+
+
+    def visit_Name(self, node):
+        self.tag = f"<{node.id}>"
+
+
+    def visit_Call(self, node):
+        self.tag = f"<{node.func.id} "
+        for kw in node.keywords:
+            self.tag += f"{kw.arg}=\"{{}}\""
+            self.args.insert(0, kw.value)
+        self.tag += ">"
+
+
 class HTMLGenerator(ast.NodeVisitor):
     """
     Parses HTML-generating syntax into HTML.
@@ -30,19 +71,9 @@ class HTMLGenerator(ast.NodeVisitor):
 
     def visit_Subscript(self, node):
         "Subscripts are used for opening and closing HTML tags."
-        # Python >=3.9 (node.slice is an Expr)
-        if (isinstance(node.slice, ast.UnaryOp) and
-            isinstance(node.slice.op, ast.USub)):
-            # the unary - operator is used for ending tags
-            self.html = f"</{node.slice.operand.id}>" + self.html
-        elif isinstance(node.slice, ast.Name):
-            self.html = f"<{node.slice.id}>" + self.html
-        # Python <=3.8 (node.slice is an Index)
-        elif (isinstance(node.slice.value, ast.UnaryOp) and
-            isinstance(node.slice.value.op, ast.USub)):
-            self.html = f"</{node.slice.value.operand.id}>" + self.html
-        else:
-            self.html = f"<{node.slice.value.id}>" + self.html
+        tag, args = HTMLTagGenerator().generate(node.slice)
+        self.html = tag + self.html
+        self.args = args + self.args
         self.visit(node.value)
 
 
