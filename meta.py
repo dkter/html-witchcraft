@@ -18,22 +18,28 @@ class HTMLGenerator(ast.NodeVisitor):
 
 
     def visit_List(self, node):
+        "A list is typically used as the first HTML tag in a document."
         element = node.elts[0]
         if (isinstance(element, ast.UnaryOp) and
-            isinstance(element.op, ast.USub)):      # the unary - operator, used for ending tags
+            isinstance(element.op, ast.USub)):
+            # the unary - operator is used for ending tags
             self.html = f"</{element.operand.id}>" + self.html
         else:
             self.html = f"<{element.id}>" + self.html
 
 
     def visit_Subscript(self, node):
+        "Subscripts are used for opening and closing HTML tags."
+        # Python >=3.9 (node.slice is an Expr)
         if (isinstance(node.slice, ast.UnaryOp) and
-            isinstance(node.slice.op, ast.USub)):     # the unary - operator, used for ending tags
+            isinstance(node.slice.op, ast.USub)):
+            # the unary - operator is used for ending tags
             self.html = f"</{node.slice.operand.id}>" + self.html
         elif isinstance(node.slice, ast.Name):
-            self.html = f"<{node.slice.id}>" + self.html            
+            self.html = f"<{node.slice.id}>" + self.html
+        # Python <=3.8 (node.slice is an Index)
         elif (isinstance(node.slice.value, ast.UnaryOp) and
-            isinstance(node.slice.value.op, ast.USub)):     # compatibility between <=3.8 and 3.9
+            isinstance(node.slice.value.op, ast.USub)):
             self.html = f"</{node.slice.value.operand.id}>" + self.html
         else:
             self.html = f"<{node.slice.value.id}>" + self.html
@@ -41,6 +47,7 @@ class HTMLGenerator(ast.NodeVisitor):
 
 
     def visit_Call(self, node):
+        "Calls are used for embedding Python expressions."
         self.html = "{}" + self.html
         if len(node.args) <= 1:
             self.args.insert(0, node.args[0])
@@ -69,7 +76,7 @@ class RenderableFunctionTransformer(ast.NodeTransformer):
         if isinstance(node.value, ast.Ellipsis):
             html_generator = HTMLGenerator()
             html_code, args = html_generator.generate(node.slice)
-            # generates something like the following Python code:
+            # Generates something like the following Python code:
             # html_code.format(*args)
             # more literally: str.format(html_code, *args)
             return ast.Call(
@@ -91,13 +98,19 @@ class RenderableFunctionTransformer(ast.NodeTransformer):
 class PageMeta(type):
     def __new__(cls, name, bases, dct):
         if "render" in dct:
+            # Get function source
             src = inspect.getsource(dct["render"])
             src = textwrap.dedent(src)
+
+            # Transform function
             tree = RenderableFunctionTransformer().visit(ast.parse(src))
             tree = ast.fix_missing_locations(tree)
-            #print(ast.unparse(tree))
+
+            # Compile into new function
             mod = compile(tree, "<ast>", "exec")
             ns = dct["render"].__globals__
             exec(mod, ns)
+
+            # Replace the function in the class dict
             dct["render"] = ns["render"]
         return super().__new__(cls, name, bases, dct)
