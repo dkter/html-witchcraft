@@ -30,7 +30,7 @@ $ python test.py
 <html><head><title>My Cool Website</title></head><body><marquee><h1>Wheeeeeeeeee</h1></marquee></body></html>
 ```
 
-(see another example at [example.py](https://github.com/dkter/html-witchcraft/blob/master/example.py)!)
+(see another example at [example.py](https://github.com/dkter/html-witchcraft/blob/main/example.py)!)
 
 #### what the heck
 
@@ -43,4 +43,4 @@ Obviously this doesn't have as many features as, say, [jinja2](https://palletspr
 
 #### But how does it work?
 
-I might post a full technical explanation later. In the meantime, have a look at [witchcraft.py](https://github.com/dkter/html-witchcraft/blob/master/witchcraft.py). It's pretty well documented.
+I might post a full technical explanation later. In the meantime, have a look at [witchcraft.py](https://github.com/dkter/html-witchcraft/blob/main/witchcraft.py). It's pretty well documented.
